@@ -35,9 +35,6 @@
     h1 img {
       height: 60px;
     }
-    .miko {
-      height: 60px;
-    }
     .btn {
       background-color: #ff69b4;
       border: none;
@@ -97,16 +94,16 @@
 </head>
 <body>
 
-  <div id="inicio" class="pantalla activa">
-    <h1>
+  <audio id="sonidoCorrecto" src="correcto.mp3" preload="auto"></audio>
+  <audio id="sonidoError" src="error.mp3" preload="auto"></audio>
 
-      <img src="./tec-30.png" alt="mundo" />
-      Mundo Miko
-    </h1>
+  <div id="inicio" class="pantalla activa">
+    <h1><img src="./tec-30.png" alt="mundo" /> Mundo Miko</h1>
     <h2>Misión: Francia</h2>
-    <button class="btn" onclick="mostrarPantalla('mision')">¡Empezar!</button>
+    <button class="btn" onclick="iniciarMision('mision')">¡Empezar!</button>
   </div>
 
+  <!-- Misión Francia -->
   <div id="mision" class="pantalla">
     <h2>🇫🇷 Bonjour! Soy Miko ✨</h2>
     <p>Arrastrá la palabra correcta al emoji correspondiente.</p>
@@ -125,42 +122,114 @@
     </div>
   </div>
 
+  <!-- Pantalla de victoria -->
   <div id="victoria" class="pantalla">
     <h2>🎉 ¡Misión completada! 🎉</h2>
-    <p>¡Felicitaciones! Aprendiste nuevas palabras en francés 🇫🇷</p>
+    <p>¡Felicitaciones! Aprendiste nuevas palabras 🇫🇷</p>
+    <button class="btn" onclick="iniciarMision('misionJapon')">Siguiente misión: Japón 🇯🇵</button>
+  </div>
+
+  <!-- Misión Japón -->
+  <div id="misionJapon" class="pantalla">
+    <h2>🇯🇵 Konnichiwa! Soy Miko en Japón 🍜</h2>
+    <p>Arrastrá la palabra correcta al emoji correspondiente.</p>
+    <div class="drag-container">
+      <div class="drop-zone" data-palabra="neko">🐱</div>
+      <div class="drop-zone" data-palabra="arigato">🙏</div>
+      <div class="drop-zone" data-palabra="sakura">🌸</div>
+    </div>
+    <div class="drag-container" style="margin-top: 30px;">
+      <div class="palabra" draggable="true" id="neko">neko</div>
+      <div class="palabra" draggable="true" id="sakura">sakura</div>
+      <div class="palabra" draggable="true" id="arigato">arigato</div>
+      <div class="palabra" draggable="true" id="inu">inu</div>
+      <div class="palabra" draggable="true" id="sushi">sushi</div>
+      <div class="palabra" draggable="true" id="sayounara">sayounara</div>
+    </div>
   </div>
 
   <script>
+    let aciertos = 0;
+    let draggedElement = null;
+    let touchClone = null;
+
     function mostrarPantalla(id) {
       document.querySelectorAll('.pantalla').forEach(p => p.classList.remove('activa'));
       document.getElementById(id).classList.add('activa');
     }
 
-    let aciertos = 0;
+    function iniciarMision(id) {
+      aciertos = 0;
+      mostrarPantalla(id);
+      setTimeout(configurarDragAndDrop, 100);
+    }
 
-    document.querySelectorAll('.palabra').forEach(elem => {
-      elem.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text', e.target.id);
-      });
-    });
+    function configurarDragAndDrop() {
+      document.querySelectorAll('.palabra').forEach(elem => {
+        elem.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text', e.target.id);
+        });
 
-    document.querySelectorAll('.drop-zone').forEach(zone => {
-      zone.addEventListener('dragover', e => e.preventDefault());
-      zone.addEventListener('drop', e => {
-        const id = e.dataTransfer.getData('text');
-        const dragged = document.getElementById(id);
-        if (id === zone.dataset.palabra) {
-          zone.textContent = dragged.textContent + ' ✔️';
-          dragged.remove();
-          aciertos++;
-          if (aciertos === 3) {
-            setTimeout(() => mostrarPantalla('victoria'), 700);
+        elem.addEventListener('touchstart', e => {
+          draggedElement = elem;
+          touchClone = elem.cloneNode(true);
+          touchClone.style.position = 'absolute';
+          touchClone.style.pointerEvents = 'none';
+          touchClone.style.opacity = '0.7';
+          touchClone.style.zIndex = '1000';
+          touchClone.style.transform = 'scale(1.1)';
+          document.body.appendChild(touchClone);
+        });
+
+        elem.addEventListener('touchmove', e => {
+          if (!touchClone) return;
+          const touch = e.touches[0];
+          touchClone.style.left = touch.pageX - touchClone.offsetWidth / 2 + 'px';
+          touchClone.style.top = touch.pageY - touchClone.offsetHeight / 2 + 'px';
+        });
+
+        elem.addEventListener('touchend', e => {
+          if (!touchClone) return;
+          const touch = e.changedTouches[0];
+          const dropZone = document.elementFromPoint(touch.clientX, touch.clientY);
+          if (dropZone?.classList.contains('drop-zone')) {
+            verificarRespuesta(dropZone, draggedElement);
           }
-        } else {
-          alert('Oops, esa no es la palabra correcta.');
-        }
+          touchClone.remove();
+          touchClone = null;
+        });
       });
-    });
+
+      document.querySelectorAll('.drop-zone').forEach(zone => {
+        zone.addEventListener('dragover', e => e.preventDefault());
+        zone.addEventListener('drop', e => {
+          const id = e.dataTransfer.getData('text');
+          const dragged = document.getElementById(id);
+          verificarRespuesta(zone, dragged);
+        });
+      });
+    }
+
+    function verificarRespuesta(zone, dragged) {
+      const sonidoCorrecto = document.getElementById('sonidoCorrecto');
+      const sonidoError = document.getElementById('sonidoError');
+
+      if (dragged.id === zone.dataset.palabra) {
+        sonidoCorrecto.play();
+        zone.textContent = dragged.textContent + ' ✔️';
+        dragged.remove();
+        aciertos++;
+        if (aciertos === 3) {
+          setTimeout(() => mostrarPantalla('victoria'), 700);
+        }
+      } else {
+        sonidoError.play();
+        alert('Oops, esa no es la palabra correcta.');
+      }
+    }
+
+    // Iniciar drag & drop al principio
+    configurarDragAndDrop();
   </script>
 
 </body>
